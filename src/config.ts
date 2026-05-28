@@ -46,7 +46,10 @@ const DEFAULT_CONFIG: Config = {
   showLegend: true,
 
   // Legend labels
-  legendLabels: { ...DEFAULT_LEGEND_LABELS }
+  legendLabels: { ...DEFAULT_LEGEND_LABELS },
+
+  // API concurrency (requests per second)
+  concurrency: 5
 };
 
 export function mergeConfig(userConfig: UserConfig): Config {

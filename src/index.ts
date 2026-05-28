@@ -9,7 +9,7 @@ import * as fs from 'fs';
 
 import { mergeConfig } from './config';
 import { mercator, calculateBounds, findClosestPointIndex } from './geo';
-import { sleep, getChinaGeoJSON } from './api';
+import { getChinaGeoJSON } from './api';
 import { createProvider } from './providers';
 import {
   drawPaperTexture,
@@ -65,6 +65,23 @@ async function resolveLocation(
 }
 
 /**
+ * Execute async tasks with rate limiting (max N per second).
+ */
+async function rateLimited<T>(tasks: (() => Promise<T>)[], perSecond: number): Promise<T[]> {
+  const results: T[] = [];
+  for (let i = 0; i < tasks.length; i += perSecond) {
+    const batch = tasks.slice(i, i + perSecond);
+    const batchResults = await Promise.all(batch.map(fn => fn()));
+    results.push(...batchResults);
+    // Wait for the rest of the 1-second window if more batches remain
+    if (i + perSecond < tasks.length) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  return results;
+}
+
+/**
  * Generate a hand-drawn style route map
  */
 export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
@@ -97,54 +114,40 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   // Ambient decorations (sun, clouds, heart in empty areas)
   drawAmbientDecorations(rc, ctx, config.width, config.height);
 
-  // Resolve start city (required - throw on failure)
-  const startCity = await resolveLocation(config.route.start, provider);
-  if (!startCity) {
-    throw new Error('Failed to resolve start location. Provide name or lat/lng.');
-  }
-  await sleep(200);
+  // Resolve all locations with rate limiting
+  const locationTasks: (() => Promise<Location | null>)[] = [
+    () => resolveLocation(config.route.start, provider).then(r => {
+      if (!r) throw new Error('Failed to resolve start location. Provide name or lat/lng.');
+      return r;
+    }),
+    () => config.route.end
+      ? resolveLocation(config.route.end, provider).then(r => {
+          if (!r) throw new Error('Failed to resolve end location. Provide name or lat/lng.');
+          return r;
+        })
+      : Promise.resolve(null),
+    ...config.route.waypoints.map(w => () =>
+      resolveLocation(w, provider).catch((e: any) => {
+        console.warn(`Skipping waypoint: ${e.message}`);
+        return null;
+      })
+    ),
+    () => config.currentCity
+      ? resolveLocation(config.currentCity, provider).then(r => {
+          if (!r) throw new Error('Failed to resolve currentCity. Provide name or lat/lng.');
+          return r;
+        })
+      : Promise.resolve(null)
+  ];
 
-  // Resolve end city (optional)
-  let endCity: Location | null = null;
-  if (config.route.end) {
-    endCity = await resolveLocation(config.route.end, provider);
-    if (!endCity) {
-      throw new Error('Failed to resolve end location. Provide name or lat/lng.');
-    }
-    await sleep(200);
-  }
+  const locationResults = await rateLimited(locationTasks, config.concurrency);
 
-  // Resolve waypoints (skip on failure)
-  const waypointCities: Location[] = [];
-  for (const w of config.route.waypoints) {
-    await sleep(200);
-    try {
-      const resolved = await resolveLocation(w, provider);
-      if (resolved) {
-        waypointCities.push(resolved);
-      } else {
-        console.warn('Skipping waypoint: no name or coordinates provided');
-      }
-    } catch (e: any) {
-      console.warn(`Skipping waypoint: ${e.message}`);
-    }
-  }
-
-  // Resolve current city (required - throw on failure)
-  await sleep(200);
-  let currentCity: Location;
-  if (config.currentCity) {
-    const resolved = await resolveLocation(config.currentCity, provider);
-    if (!resolved) {
-      throw new Error('Failed to resolve currentCity. Provide name or lat/lng.');
-    }
-    currentCity = resolved;
-  } else {
-    currentCity = startCity;
-  }
+  const startCity = locationResults[0]!;
+  const endCity = locationResults[1];
+  const waypointCities: Location[] = locationResults.slice(2, -1).filter((c): c is Location => c !== null);
+  const currentCity: Location = locationResults[locationResults.length - 1] || startCity;
 
   // Fetch route
-  await sleep(300);
   const routeEnd = endCity || waypointCities[waypointCities.length - 1] || currentCity;
   const routePoints = await provider.getRoute(startCity, routeEnd, waypointCities.filter(c => c !== routeEnd));
 

@@ -74,6 +74,8 @@ export interface UserConfig {
   showTitle?: boolean;
   showLegend?: boolean;
   legendLabels?: LegendLabels;
+  /** Max API requests per second (default: 5) */
+  concurrency?: number;
 }
 
 /** Merged full configuration */
@@ -89,6 +91,7 @@ export interface Config {
   showTitle: boolean;
   showLegend: boolean;
   legendLabels: Required<LegendLabels>;
+  concurrency: number;
 }
 
 /** City marker drawing options */
