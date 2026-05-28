@@ -1,0 +1,94 @@
+/**
+ * Shared type definitions
+ */
+
+/** A geographic coordinate point */
+export interface Point {
+  lat: number;
+  lng: number;
+}
+
+/** A resolved location with name and coordinates */
+export interface Location extends Point {
+  name: string;
+}
+
+/** User-provided location input: name, coordinates, or both */
+export interface LocationInput {
+  name?: string;
+  lat?: number;
+  lng?: number;
+}
+
+/** Map provider interface */
+export interface MapProvider {
+  geocode(cityName: string): Promise<Location>;
+  getRoute(from: Point, to: Point, waypoints?: Point[]): Promise<Point[]>;
+}
+
+/** Bounding box for coordinate projection */
+export interface Bounds {
+  minLng: number;
+  maxLng: number;
+  minLat: number;
+  maxLat: number;
+}
+
+/** Projected 2D point on canvas */
+export interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+/** Route configuration */
+export interface RouteConfig {
+  start: LocationInput | null;
+  end: LocationInput | null;
+  waypoints: LocationInput[];
+}
+
+/** Hand-drawn style configuration */
+export interface StyleConfig {
+  roughness: number;
+  bowing: number;
+  paperTexture: boolean;
+}
+
+/** User configuration input */
+export interface UserConfig {
+  width?: number;
+  height?: number;
+  mapProvider?: string;
+  apiKey?: string;
+  route?: Partial<RouteConfig>;
+  currentCity?: LocationInput | null;
+  style?: Partial<StyleConfig>;
+  output?: string;
+}
+
+/** Merged full configuration */
+export interface Config {
+  width: number;
+  height: number;
+  mapProvider: string;
+  apiKey: string;
+  route: RouteConfig;
+  currentCity: LocationInput | null;
+  style: StyleConfig;
+  output: string;
+}
+
+/** City marker drawing options */
+export interface CityMarkerOptions {
+  type: 'start' | 'end' | 'waypoint' | 'current';
+  color: string;
+  label: string;
+}
+
+/** Route drawing style */
+export interface RouteStyle {
+  stroke: string;
+  strokeWidth: number;
+  roughness: number;
+  bowing: number;
+}

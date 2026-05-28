@@ -1,0 +1,92 @@
+{
+  "name": "rough-route-map",
+  "version": "1.0.0",
+  "description": "Hand-drawn style route map generator powered by Rough.js and Skia Canvas",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./geo": {
+      "types": "./dist/geo.d.ts",
+      "default": "./dist/geo.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    },
+    "./drawing": {
+      "types": "./dist/drawing.d.ts",
+      "default": "./dist/drawing.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./providers": {
+      "types": "./dist/providers/index.d.ts",
+      "default": "./dist/providers/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc && node scripts/minify.js",
+    "build:dev": "tsc",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "prepublishOnly": "yarn build",
+    "example": "yarn build:dev && node examples/node/generate.js",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "map",
+    "route",
+    "hand-drawn",
+    "roughjs",
+    "skia-canvas",
+    "route-map",
+    "china-map"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0",
+    "roughjs": "^4.6.6",
+    "skia-canvas": "^1.0.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.0.1",
+    "@commitlint/config-conventional": "^21.0.1",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.1",
+    "@types/node-fetch": "^2.6.13",
+    "eslint": "^10.4.0",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
+    "terser": "^5.48.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix"
+    ]
+  }
+}
