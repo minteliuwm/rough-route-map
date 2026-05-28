@@ -52,7 +52,10 @@ const DEFAULT_CONFIG: Config = {
   concurrency: 5,
 
   // DPI scale factor
-  dpi: 2
+  dpi: 2,
+
+  // Canvas provider
+  canvasProvider: 'skia-canvas'
 };
 
 export function mergeConfig(userConfig: UserConfig): Config {

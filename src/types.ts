@@ -61,6 +61,9 @@ export interface LegendLabels {
   remaining?: string;
 }
 
+/** Canvas provider type */
+export type CanvasProvider = 'skia-canvas' | 'canvas';
+
 /** User configuration input */
 export interface UserConfig {
   width?: number;
@@ -78,6 +81,8 @@ export interface UserConfig {
   concurrency?: number;
   /** DPI scale factor for output clarity (default: 2) */
   dpi?: number;
+  /** Canvas implementation to use (default: 'skia-canvas') */
+  canvasProvider?: CanvasProvider;
 }
 
 /** Merged full configuration */
@@ -95,6 +100,7 @@ export interface Config {
   legendLabels: Required<LegendLabels>;
   concurrency: number;
   dpi: number;
+  canvasProvider: CanvasProvider;
 }
 
 /** City marker drawing options */

@@ -3,11 +3,11 @@
  * Hand-drawn style route map generator
  */
 
-const { Canvas } = require('skia-canvas');
 const rough = require('roughjs');
 import * as fs from 'fs';
 
 import { mergeConfig } from './config';
+import { createCanvas } from './canvas-factory';
 import { mercator, calculateBounds, findClosestPointIndex } from './geo';
 import { getChinaGeoJSON } from './api';
 import { createProvider } from './providers';
@@ -97,10 +97,10 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   const provider = createProvider(config.mapProvider, config.apiKey);
 
   const dpi = config.dpi;
-  const canvas = new Canvas(config.width * dpi, config.height * dpi);
-  const ctx = canvas.getContext('2d');
+  const canvasWrapper = createCanvas(config.width * dpi, config.height * dpi, config.canvasProvider);
+  const ctx = canvasWrapper.ctx;
   ctx.scale(dpi, dpi);
-  const rc = rough.canvas(canvas);
+  const rc = rough.canvas(canvasWrapper.raw);
 
   // Paper texture background
   if (config.style.paperTexture) {
@@ -255,7 +255,7 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   }
 
   // Generate buffer
-  const buffer = await canvas.toBuffer('png');
+  const buffer = await canvasWrapper.toBuffer();
 
   // Save to file if output path is specified
   if (config.output) {
