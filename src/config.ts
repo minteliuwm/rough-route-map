@@ -49,7 +49,10 @@ const DEFAULT_CONFIG: Config = {
   legendLabels: { ...DEFAULT_LEGEND_LABELS },
 
   // API concurrency (requests per second)
-  concurrency: 5
+  concurrency: 5,
+
+  // DPI scale factor
+  dpi: 2
 };
 
 export function mergeConfig(userConfig: UserConfig): Config {

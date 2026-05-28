@@ -76,6 +76,8 @@ export interface UserConfig {
   legendLabels?: LegendLabels;
   /** Max API requests per second (default: 5) */
   concurrency?: number;
+  /** DPI scale factor for output clarity (default: 2) */
+  dpi?: number;
 }
 
 /** Merged full configuration */
@@ -92,6 +94,7 @@ export interface Config {
   showLegend: boolean;
   legendLabels: Required<LegendLabels>;
   concurrency: number;
+  dpi: number;
 }
 
 /** City marker drawing options */

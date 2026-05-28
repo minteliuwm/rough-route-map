@@ -96,8 +96,10 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
 
   const provider = createProvider(config.mapProvider, config.apiKey);
 
-  const canvas = new Canvas(config.width, config.height);
+  const dpi = config.dpi;
+  const canvas = new Canvas(config.width * dpi, config.height * dpi);
   const ctx = canvas.getContext('2d');
+  ctx.scale(dpi, dpi);
   const rc = rough.canvas(canvas);
 
   // Paper texture background
@@ -196,7 +198,7 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   if (remaining.length > 1) {
     drawDashedRoute(rc, remaining, project, {
       stroke: COLOR.remaining,
-      strokeWidth: 3,
+      strokeWidth: 3.5,
       roughness: config.style.roughness * 1.2,
       bowing: config.style.bowing
     });

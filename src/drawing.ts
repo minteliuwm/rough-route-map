@@ -22,14 +22,14 @@ type CanvasContext = any;
 const COLOR = {
   bg: '#F5EDE0',
   text: '#5D4E3C',
-  outline: '#C4B8A8',
+  outline: '#B8A999',
   outlineFill: 'rgba(245, 237, 224, 0.25)',
   outlineFillMainland: 'rgba(248, 242, 230, 0.4)',
   label: {
     bg: 'rgba(255, 252, 245, 0.92)',
     border: '#C4B8A8'
   },
-  traveled: '#E67C73',
+  traveled: '#D9635A',
   remaining: '#87C9B8',
   start: '#8FC5A0',
   waypoint: '#7EB8D8',
@@ -140,8 +140,8 @@ export function drawPolygon(
 
   rc.path(path, {
     fill: isMainland ? COLOR.outlineFillMainland : COLOR.outlineFill,
-    fillStyle: 'hachure', hachureAngle: 60, hachureGap: 12,
-    stroke: COLOR.outline, strokeWidth: 0.8, roughness: 0.8, bowing: 0.4
+    fillStyle: 'hachure', hachureAngle: 60, hachureGap: 14,
+    stroke: COLOR.outline + '73', strokeWidth: 0.6, roughness: 0.6, bowing: 0.3
   });
 }
 
@@ -159,6 +159,17 @@ export function drawRoute(
 ): void {
   const sampled = samplePoints(points, 5);
 
+  // Layer 0: soft shadow for depth
+  for (let i = 0; i < sampled.length - 1; i++) {
+    const from = project(sampled[i].lng, sampled[i].lat);
+    const to = project(sampled[i + 1].lng, sampled[i + 1].lat);
+    rc.line(
+      from.x + 1.5, from.y + 1.5,
+      to.x + 1.5, to.y + 1.5,
+      { ...style, strokeWidth: style.strokeWidth * 1.8, stroke: '#5D4E3C12', roughness: style.roughness * 0.4 }
+    );
+  }
+
   // Layer 1: marker bleed / highlight glow (wide, very translucent)
   for (let i = 0; i < sampled.length - 1; i++) {
     const from = project(sampled[i].lng, sampled[i].lat);
@@ -166,7 +177,7 @@ export function drawRoute(
     rc.line(
       jitter(from.x, 0.8), jitter(from.y, 0.8),
       jitter(to.x, 0.8), jitter(to.y, 0.8),
-      { ...style, strokeWidth: style.strokeWidth * 2.5, stroke: style.stroke + '18', roughness: style.roughness * 0.6 }
+      { ...style, strokeWidth: style.strokeWidth * 2.5, stroke: style.stroke + '20', roughness: style.roughness * 0.6 }
     );
   }
 
@@ -195,14 +206,27 @@ export function drawDashedRoute(
   project: (lng: number, lat: number) => CanvasPoint,
   style: RouteStyle
 ): void {
-  const sampled = samplePoints(points, 5);
-  // Use a lighter stroke (append alpha hex)
-  const softStyle = { ...style, stroke: style.stroke + '90' };
-  for (let i = 0; i < sampled.length - 1; i += 2) {
+  const sampled = samplePoints(points, 4);
+
+  // Layer 1: subtle glow underlayer for visibility
+  for (let i = 0; i < sampled.length - 1; i += 3) {
     if (i + 1 < sampled.length) {
       const from = project(sampled[i].lng, sampled[i].lat);
       const to = project(sampled[i + 1].lng, sampled[i + 1].lat);
-      rc.line(from.x, from.y, to.x, to.y, softStyle);
+      rc.line(from.x, from.y, to.x, to.y, {
+        ...style, strokeWidth: style.strokeWidth * 2, stroke: style.stroke + '20', roughness: style.roughness * 0.5
+      });
+    }
+  }
+
+  // Layer 2: main dashed stroke (long dash, long gap)
+  for (let i = 0; i < sampled.length - 1; i += 3) {
+    // Draw 2 segments, skip 1 (longer dash rhythm)
+    for (let j = 0; j < 2 && i + j + 1 < sampled.length; j++) {
+      const idx = i + j;
+      const from = project(sampled[idx].lng, sampled[idx].lat);
+      const to = project(sampled[idx + 1].lng, sampled[idx + 1].lat);
+      rc.line(from.x, from.y, to.x, to.y, style);
     }
   }
 }
@@ -326,10 +350,14 @@ function drawHouseIcon(rc: RoughCanvas, ctx: CanvasContext, x: number, y: number
  * Hand-drawn car icon (current) - ENHANCED: larger, with glow ring
  */
 function drawCarIcon(rc: RoughCanvas, ctx: CanvasContext, x: number, y: number, color: string): void {
-  // Pulsing glow ring (warm orange halo)
+  // Pulsing glow ring (warm orange halo) - wide & soft
+  ctx.globalAlpha = 0.07;
+  rc.circle(x, y, 72, {
+    fill: color, fillStyle: 'solid', stroke: 'none', roughness: 2.5
+  });
   ctx.globalAlpha = 0.12;
   rc.circle(x, y, 52, {
-    fill: color, fillStyle: 'solid', stroke: 'none', roughness: 2.5
+    fill: color, fillStyle: 'solid', stroke: 'none', roughness: 2.2
   });
   ctx.globalAlpha = 0.2;
   rc.circle(x, y, 36, {
