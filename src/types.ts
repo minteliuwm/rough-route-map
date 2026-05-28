@@ -111,3 +111,69 @@ export interface RouteStyle {
   roughness: number;
   bowing: number;
 }
+
+// ─── GeoJSON types (simplified) ─────────────────────────────────────
+
+export interface GeoJSONGeometry {
+  type: string;
+  coordinates: number[][] | number[][][] | number[][][][];
+}
+
+export interface GeoJSONFeature {
+  type: string;
+  properties: { name?: string; [key: string]: unknown };
+  geometry: GeoJSONGeometry;
+}
+
+export interface GeoJSONFeatureCollection {
+  type: string;
+  features: GeoJSONFeature[];
+}
+
+// ─── Map API response types ─────────────────────────────────────────
+
+export interface AmapGeocodeResponse {
+  status: string;
+  info?: string;
+  geocodes?: { location: string }[];
+}
+
+export interface AmapRegeoResponse {
+  status: string;
+  info?: string;
+  regeocode?: {
+    addressComponent: { city?: string; district?: string; province?: string };
+    formatted_address?: string;
+  };
+}
+
+export interface AmapRouteStep {
+  polyline: string;
+}
+
+export interface AmapRouteResponse {
+  status: string;
+  info?: string;
+  route?: { paths: { steps: AmapRouteStep[] }[] };
+}
+
+export interface TencentGeocodeResponse {
+  status: number;
+  message?: string;
+  result?: { location: { lat: number; lng: number } };
+}
+
+export interface TencentRegeoResponse {
+  status: number;
+  message?: string;
+  result?: {
+    address_component: { city?: string; district?: string; province?: string };
+    address?: string;
+  };
+}
+
+export interface TencentRouteResponse {
+  status: number;
+  message?: string;
+  result?: { routes: { polyline: number[] }[] };
+}

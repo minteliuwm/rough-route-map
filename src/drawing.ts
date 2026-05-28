@@ -15,7 +15,9 @@
 
 import { Point, Location, CanvasPoint, CityMarkerOptions, RouteStyle } from './types';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- roughjs has no type definitions
 type RoughCanvas = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- skia-canvas has no type definitions
 type CanvasContext = any;
 
 // ─── Color constants ────────────────────────────────────────────────

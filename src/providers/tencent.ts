@@ -3,7 +3,7 @@
  */
 
 import fetch from 'node-fetch';
-import { MapProvider, Location, Point } from '../types';
+import { MapProvider, Location, Point, TencentGeocodeResponse, TencentRegeoResponse, TencentRouteResponse } from '../types';
 
 /**
  * Decode Tencent Map polyline (character-encoded format)
@@ -54,7 +54,7 @@ export function createProvider(apiKey: string): MapProvider {
     async geocode(cityName: string): Promise<Location> {
       const url = `https://apis.map.qq.com/ws/geocoder/v1/?address=${encodeURIComponent(cityName)}&key=${apiKey}`;
       const res = await fetch(url);
-      const data = await res.json() as any;
+      const data = await res.json() as TencentGeocodeResponse;
 
       if (data.status !== 0) {
         throw new Error(`Geocoding failed [${cityName}]: ${data.message}`);
@@ -62,22 +62,22 @@ export function createProvider(apiKey: string): MapProvider {
 
       return {
         name: cityName,
-        lng: data.result.location.lng,
-        lat: data.result.location.lat
+        lng: data.result!.location.lng,
+        lat: data.result!.location.lat
       };
     },
 
     async reverseGeocode(lat: number, lng: number): Promise<string> {
       const url = `https://apis.map.qq.com/ws/geocoder/v1/?location=${lat},${lng}&key=${apiKey}`;
       const res = await fetch(url);
-      const data = await res.json() as any;
+      const data = await res.json() as TencentRegeoResponse;
 
       if (data.status !== 0) {
         throw new Error(`Reverse geocoding failed [${lat},${lng}]: ${data.message}`);
       }
 
-      const addr = data.result.address_component;
-      return addr.city || addr.district || addr.province || data.result.address || '';
+      const addr = data.result!.address_component;
+      return addr.city || addr.district || addr.province || data.result!.address || '';
     },
 
     async getRoute(from: Point, to: Point, waypoints: Point[] = []): Promise<Point[]> {
@@ -91,13 +91,13 @@ export function createProvider(apiKey: string): MapProvider {
       if (waypointsStr) url += `&waypoints=${waypointsStr}`;
 
       const res = await fetch(url);
-      const data = await res.json() as any;
+      const data = await res.json() as TencentRouteResponse;
 
       if (data.status !== 0) {
         throw new Error(`Route planning failed: ${data.message}`);
       }
 
-      const route = data.result.routes[0];
+      const route = data.result!.routes[0];
       const polyline: number[] = route.polyline;
 
       const points: Point[] = [];

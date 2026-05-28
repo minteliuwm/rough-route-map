@@ -4,9 +4,11 @@
 
 import fetch from 'node-fetch';
 
+import { GeoJSONFeatureCollection } from './types';
+
 export const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
 
-export async function getChinaGeoJSON(): Promise<any> {
+export async function getChinaGeoJSON(): Promise<GeoJSONFeatureCollection> {
   try {
     const url = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
     const res = await fetch(url);

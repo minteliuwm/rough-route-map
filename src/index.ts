@@ -129,8 +129,8 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
         })
       : Promise.resolve(null),
     ...config.route.waypoints.map(w => () =>
-      resolveLocation(w, provider).catch((e: any) => {
-        console.warn(`Skipping waypoint: ${e.message}`);
+      resolveLocation(w, provider).catch((e: unknown) => {
+        console.warn(`Skipping waypoint: ${e instanceof Error ? e.message : String(e)}`);
         return null;
       })
     ),
@@ -167,18 +167,18 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   // Draw China outline (subtle, light strokes)
   try {
     const chinaGeoJSON = await getChinaGeoJSON();
-    chinaGeoJSON.features.forEach((feature: any) => {
+    chinaGeoJSON.features.forEach((feature) => {
       const coords = feature.geometry.coordinates;
       const type = feature.geometry.type;
 
       if (type === 'Polygon') {
-        drawPolygon(rc, coords[0], project, feature.properties.name === 'China');
+        drawPolygon(rc, coords[0] as number[][], project, feature.properties.name === 'China');
       } else if (type === 'MultiPolygon') {
-        coords.forEach((polygon: number[][][]) => drawPolygon(rc, polygon[0], project, false));
+        (coords as number[][][][]).forEach((polygon) => drawPolygon(rc, polygon[0], project, false));
       }
     });
-  } catch (e: any) {
-    console.warn('Outline drawing failed:', e.message);
+  } catch (e: unknown) {
+    console.warn('Outline drawing failed:', e instanceof Error ? e.message : String(e));
   }
 
   // Draw route (traveled / remaining) with healing-style colors
