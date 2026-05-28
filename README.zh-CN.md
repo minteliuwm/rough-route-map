@@ -64,7 +64,7 @@ const buffer = await generateMap({
 | `mapProvider` | `string` | `'tencent'` | 地图服务商（`'tencent'` \| `'amap'`） |
 | `apiKey` | `string` | - | 地图 API Key **（必填）** |
 | `route.start` | `LocationInput` | - | 起点位置 **（必填）** |
-| `route.end` | `LocationInput` | - | 终点位置 **（必填）** |
+| `route.end` | `LocationInput` | `null` | 终点位置（可选；省略时使用最后一个途经点或 currentCity） |
 | `route.waypoints` | `LocationInput[]` | `[]` | 途经点 |
 | `currentCity` | `LocationInput` | `null` | 当前所在位置（区分已行驶/未行驶） |
 | `width` | `number` | `1200` | 画布宽度（px） |
@@ -78,6 +78,7 @@ const buffer = await generateMap({
 | `legendLabels.remaining` | `string` | `'Remaining'` | 未行驶路段的图例标签 |
 | `concurrency` | `number` | `5` | 每秒最大 API 请求数 |
 | `dpi` | `number` | `2` | DPI 缩放系数，数值越大输出越清晰 |
+| `canvasProvider` | `string` | `'skia-canvas'` | Canvas 实现（`'skia-canvas'` \| `'canvas'`） |
 | `output` | `string` | `'./route-map.png'` | 输出路径（空字符串则不保存文件） |
 
 ### 位置对象
@@ -168,12 +169,13 @@ yarn example
 ```
 rough-route-map/
 ├── src/
-│   ├── index.ts        # 包入口 - 导出 generateMap()
-│   ├── types.ts        # TypeScript 类型定义
-│   ├── config.ts       # 默认配置与 mergeConfig()
-│   ├── geo.ts          # 投影、边界计算、最近点查找
-│   ├── api.ts          # 通用 API 工具（GeoJSON）
-│   ├── drawing.ts      # Canvas 渲染（纹理、多边形、路线、标记、图例）
+│   ├── index.ts          # 包入口 - 导出 generateMap()
+│   ├── types.ts          # TypeScript 类型定义
+│   ├── config.ts         # 默认配置与 mergeConfig()
+│   ├── canvas-factory.ts # Canvas 提供者抽象（skia-canvas / node-canvas）
+│   ├── geo.ts            # 投影、边界计算、最近点查找
+│   ├── api.ts            # 通用 API 工具（GeoJSON）
+│   ├── drawing.ts        # Canvas 渲染（纹理、多边形、路线、标记、图例）
 │   └── providers/
 │       ├── index.ts    # Provider 工厂
 │       ├── tencent.ts  # 腾讯地图 Provider

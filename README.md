@@ -64,7 +64,7 @@ Returns a PNG image buffer.
 | `mapProvider` | `string` | `'tencent'` | Map provider (`'tencent'` \| `'amap'`) |
 | `apiKey` | `string` | - | Map API Key **(required)** |
 | `route.start` | `LocationInput` | - | Start location **(required)** |
-| `route.end` | `LocationInput` | - | End location **(required)** |
+| `route.end` | `LocationInput` | `null` | End location (optional; if omitted, the last waypoint or currentCity is used) |
 | `route.waypoints` | `LocationInput[]` | `[]` | Waypoint locations |
 | `currentCity` | `LocationInput` | `null` | Current location (splits traveled/remaining) |
 | `width` | `number` | `1200` | Canvas width (px) |
@@ -78,6 +78,7 @@ Returns a PNG image buffer.
 | `legendLabels.remaining` | `string` | `'Remaining'` | Legend label for remaining segments |
 | `concurrency` | `number` | `5` | Max API requests per second |
 | `dpi` | `number` | `2` | DPI scale factor for output clarity |
+| `canvasProvider` | `string` | `'skia-canvas'` | Canvas implementation (`'skia-canvas'` \| `'canvas'`) |
 | `output` | `string` | `'./route-map.png'` | Output path (empty string to skip file saving) |
 
 ### Location object
@@ -168,12 +169,13 @@ yarn example
 ```
 rough-route-map/
 ├── src/
-│   ├── index.ts        # Package entry - exports generateMap()
-│   ├── types.ts        # TypeScript type definitions
-│   ├── config.ts       # Default config and mergeConfig()
-│   ├── geo.ts          # Projection, bounds, closest point
-│   ├── api.ts          # Common API utilities (GeoJSON)
-│   ├── drawing.ts      # Canvas rendering (texture, polygons, routes, markers, legend)
+│   ├── index.ts          # Package entry - exports generateMap()
+│   ├── types.ts          # TypeScript type definitions
+│   ├── config.ts         # Default config and mergeConfig()
+│   ├── canvas-factory.ts # Canvas provider abstraction (skia-canvas / node-canvas)
+│   ├── geo.ts            # Projection, bounds, closest point
+│   ├── api.ts            # Common API utilities (GeoJSON)
+│   ├── drawing.ts        # Canvas rendering (texture, polygons, routes, markers, legend)
 │   └── providers/
 │       ├── index.ts    # Provider factory
 │       ├── tencent.ts  # Tencent Map provider
