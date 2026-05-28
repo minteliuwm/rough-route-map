@@ -2,7 +2,12 @@
  * Default configuration
  */
 
-import { Config, UserConfig, RouteConfig, StyleConfig } from './types';
+import { Config, UserConfig, RouteConfig, StyleConfig, LegendLabels } from './types';
+
+const DEFAULT_LEGEND_LABELS: Required<LegendLabels> = {
+  traveled: 'Traveled',
+  remaining: 'Remaining'
+};
 
 const DEFAULT_CONFIG: Config = {
   width: 1200,
@@ -32,7 +37,16 @@ const DEFAULT_CONFIG: Config = {
   },
 
   // Output file path
-  output: './route-map.png'
+  output: './route-map.png',
+
+  // Show route title at top
+  showTitle: true,
+
+  // Show legend
+  showLegend: true,
+
+  // Legend labels
+  legendLabels: { ...DEFAULT_LEGEND_LABELS }
 };
 
 export function mergeConfig(userConfig: UserConfig): Config {
@@ -40,7 +54,8 @@ export function mergeConfig(userConfig: UserConfig): Config {
     ...DEFAULT_CONFIG,
     ...userConfig,
     route: { ...DEFAULT_CONFIG.route, ...(userConfig.route || {}) } as RouteConfig,
-    style: { ...DEFAULT_CONFIG.style, ...(userConfig.style || {}) } as StyleConfig
+    style: { ...DEFAULT_CONFIG.style, ...(userConfig.style || {}) } as StyleConfig,
+    legendLabels: { ...DEFAULT_LEGEND_LABELS, ...(userConfig.legendLabels || {}) }
   };
 }
 

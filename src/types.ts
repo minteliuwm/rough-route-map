@@ -23,6 +23,7 @@ export interface LocationInput {
 /** Map provider interface */
 export interface MapProvider {
   geocode(cityName: string): Promise<Location>;
+  reverseGeocode(lat: number, lng: number): Promise<string>;
   getRoute(from: Point, to: Point, waypoints?: Point[]): Promise<Point[]>;
 }
 
@@ -43,7 +44,7 @@ export interface CanvasPoint {
 /** Route configuration */
 export interface RouteConfig {
   start: LocationInput | null;
-  end: LocationInput | null;
+  end?: LocationInput | null;
   waypoints: LocationInput[];
 }
 
@@ -52,6 +53,12 @@ export interface StyleConfig {
   roughness: number;
   bowing: number;
   paperTexture: boolean;
+}
+
+/** Legend label configuration */
+export interface LegendLabels {
+  traveled?: string;
+  remaining?: string;
 }
 
 /** User configuration input */
@@ -64,6 +71,9 @@ export interface UserConfig {
   currentCity?: LocationInput | null;
   style?: Partial<StyleConfig>;
   output?: string;
+  showTitle?: boolean;
+  showLegend?: boolean;
+  legendLabels?: LegendLabels;
 }
 
 /** Merged full configuration */
@@ -76,6 +86,9 @@ export interface Config {
   currentCity: LocationInput | null;
   style: StyleConfig;
   output: string;
+  showTitle: boolean;
+  showLegend: boolean;
+  legendLabels: Required<LegendLabels>;
 }
 
 /** City marker drawing options */

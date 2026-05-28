@@ -24,6 +24,19 @@ export function createProvider(apiKey: string): MapProvider {
       };
     },
 
+    async reverseGeocode(lat: number, lng: number): Promise<string> {
+      const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json() as any;
+
+      if (data.status !== '1' || !data.regeocode) {
+        throw new Error(`Reverse geocoding failed [${lat},${lng}]: ${data.info || 'Unknown error'}`);
+      }
+
+      const addr = data.regeocode.addressComponent;
+      return addr.city || addr.district || addr.province || data.regeocode.formatted_address || '';
+    },
+
     async getRoute(from: Point, to: Point, waypoints: Point[] = []): Promise<Point[]> {
       const origin = `${from.lng},${from.lat}`;
       const destination = `${to.lng},${to.lat}`;

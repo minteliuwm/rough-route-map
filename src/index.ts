@@ -13,11 +13,16 @@ import { sleep, getChinaGeoJSON } from './api';
 import { createProvider } from './providers';
 import {
   drawPaperTexture,
+  drawBorder,
   drawPolygon,
   drawRoute,
   drawDashedRoute,
+  drawRouteDecorations,
+  drawAmbientDecorations,
   drawCityMarker,
-  drawLegend
+  drawTitle,
+  drawLegend,
+  COLOR
 } from './drawing';
 import { UserConfig, Location, LocationInput, MapProvider } from './types';
 
@@ -40,7 +45,16 @@ async function resolveLocation(
   if (!loc) return null;
 
   if (hasCoordinates(loc)) {
-    return { name: loc.name || '', lat: loc.lat!, lng: loc.lng! };
+    let name = loc.name || '';
+    // Reverse geocode to get city name if not provided
+    if (!name) {
+      try {
+        name = await provider.reverseGeocode(loc.lat!, loc.lng!);
+      } catch {
+        console.warn(`Reverse geocoding failed for [${loc.lat},${loc.lng}], name will be empty`);
+      }
+    }
+    return { name, lat: loc.lat!, lng: loc.lng! };
   }
 
   if (loc.name) {
@@ -59,8 +73,8 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   if (!config.apiKey) {
     throw new Error('Missing apiKey. Please provide a map API key.');
   }
-  if (!config.route.start || !config.route.end) {
-    throw new Error('Missing route.start or route.end');
+  if (!config.route.start) {
+    throw new Error('Missing route.start');
   }
 
   const provider = createProvider(config.mapProvider, config.apiKey);
@@ -73,9 +87,15 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   if (config.style.paperTexture) {
     drawPaperTexture(ctx, config.width, config.height);
   } else {
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = COLOR.bg;
     ctx.fillRect(0, 0, config.width, config.height);
   }
+
+  // Torn-paper decorative border
+  drawBorder(rc, ctx, config.width, config.height);
+
+  // Ambient decorations (sun, clouds, heart in empty areas)
+  drawAmbientDecorations(rc, ctx, config.width, config.height);
 
   // Resolve start city (required - throw on failure)
   const startCity = await resolveLocation(config.route.start, provider);
@@ -84,12 +104,15 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   }
   await sleep(200);
 
-  // Resolve end city (required - throw on failure)
-  const endCity = await resolveLocation(config.route.end, provider);
-  if (!endCity) {
-    throw new Error('Failed to resolve end location. Provide name or lat/lng.');
+  // Resolve end city (optional)
+  let endCity: Location | null = null;
+  if (config.route.end) {
+    endCity = await resolveLocation(config.route.end, provider);
+    if (!endCity) {
+      throw new Error('Failed to resolve end location. Provide name or lat/lng.');
+    }
+    await sleep(200);
   }
-  await sleep(200);
 
   // Resolve waypoints (skip on failure)
   const waypointCities: Location[] = [];
@@ -122,14 +145,21 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
 
   // Fetch route
   await sleep(300);
-  const routePoints = await provider.getRoute(startCity, endCity, waypointCities);
+  const routeEnd = endCity || waypointCities[waypointCities.length - 1] || currentCity;
+  const routePoints = await provider.getRoute(startCity, routeEnd, waypointCities.filter(c => c !== routeEnd));
 
   // Calculate bounds and projection
-  const allPoints = [...routePoints, startCity, ...waypointCities, endCity, currentCity];
-  const bounds = calculateBounds(allPoints);
-  const project = (lng: number, lat: number) => mercator(lng, lat, bounds, config.width, config.height);
+  const allPoints = [...routePoints, startCity, ...waypointCities, currentCity, ...(endCity ? [endCity] : [])];
+  const bounds = calculateBounds(allPoints, currentCity);
+  const padding = {
+    top: config.showTitle ? 70 : 15,
+    bottom: config.showLegend ? 110 : 15,
+    left: 15,
+    right: 15
+  };
+  const project = (lng: number, lat: number) => mercator(lng, lat, bounds, config.width, config.height, padding);
 
-  // Draw China outline
+  // Draw China outline (subtle, light strokes)
   try {
     const chinaGeoJSON = await getChinaGeoJSON();
     chinaGeoJSON.features.forEach((feature: any) => {
@@ -146,13 +176,13 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
     console.warn('Outline drawing failed:', e.message);
   }
 
-  // Draw route (traveled / remaining)
+  // Draw route (traveled / remaining) with healing-style colors
   const currentIndex = findClosestPointIndex(routePoints, currentCity);
 
   const traveled = routePoints.slice(0, currentIndex + 1);
   if (traveled.length > 1) {
     drawRoute(rc, traveled, project, {
-      stroke: '#E74C3C',
+      stroke: COLOR.traveled,
       strokeWidth: 4,
       roughness: config.style.roughness,
       bowing: config.style.bowing
@@ -162,43 +192,62 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   const remaining = routePoints.slice(currentIndex);
   if (remaining.length > 1) {
     drawDashedRoute(rc, remaining, project, {
-      stroke: '#95A5A6',
+      stroke: COLOR.remaining,
       strokeWidth: 3,
       roughness: config.style.roughness * 1.2,
       bowing: config.style.bowing
     });
   }
 
-  // Draw city markers
-  const startLabel = startCity.name || 'Start';
-  drawCityMarker(rc, ctx, startCity, project, { type: 'start', color: '#27AE60', label: startLabel });
+  // Route decorations (clouds, stars, footprints)
+  drawRouteDecorations(rc, ctx, routePoints, project);
+
+  // Draw city markers with themed icons
+  drawCityMarker(rc, ctx, startCity, project, {
+    type: 'start', color: COLOR.start, label: ''
+  });
+
+  // Check if a city is the current location (by coordinate proximity)
+  const isCurrentCity = (city: Location): boolean => {
+    const dist = Math.pow(city.lat - currentCity.lat, 2) + Math.pow(city.lng - currentCity.lng, 2);
+    return dist < 0.001; // ~0.03 degree tolerance
+  };
 
   waypointCities.forEach(city => {
-    const isCurrent = city.name === currentCity.name;
+    if (isCurrentCity(city)) return; // skip, will draw as current separately
     drawCityMarker(rc, ctx, city, project, {
-      type: isCurrent ? 'current' : 'waypoint',
-      color: isCurrent ? '#F39C12' : '#3498DB',
-      label: isCurrent ? 'Current' : ''
+      type: 'waypoint', color: COLOR.waypoint, label: ''
     });
   });
 
-  const endLabel = endCity.name || 'End';
-  drawCityMarker(rc, ctx, endCity, project, { type: 'end', color: '#E74C3C', label: endLabel });
+  if (endCity) {
+    drawCityMarker(rc, ctx, endCity, project, {
+      type: 'end', color: COLOR.end, label: ''
+    });
+  }
 
-  // Title
-  ctx.font = 'bold 32px "Comic Sans MS", "PingFang SC", sans-serif';
-  ctx.fillStyle = '#2C3E50';
-  ctx.textAlign = 'center';
-  const cityNames = [
-    startCity.name || 'Start',
-    ...waypointCities.map(c => c.name || '...'),
-    endCity.name || 'End'
-  ];
-  const title = cityNames.join(' > ');
-  ctx.fillText(title, config.width / 2, 50);
+  // Always draw current city marker on top (car icon)
+  if (!isCurrentCity(startCity) && !(endCity && isCurrentCity(endCity))) {
+    drawCityMarker(rc, ctx, currentCity, project, {
+      type: 'current', color: COLOR.current, label: ''
+    });
+  }
 
-  // Legend
-  drawLegend(ctx, config.width - 200, config.height - 100);
+  // Title in hand-drawn banner
+  if (config.showTitle) {
+    const cityNames = [
+      startCity.name || 'Start',
+      ...waypointCities.map(c => c.name || '...'),
+      ...(endCity ? [endCity.name || 'End'] : [])
+    ];
+    const title = cityNames.join(' > ');
+    drawTitle(rc, ctx, title, config.width);
+  }
+
+  // Legend card
+  if (config.showLegend) {
+    drawLegend(rc, ctx, config.width - 185, config.height - 95, config.legendLabels);
+  }
 
   // Generate buffer
   const buffer = await canvas.toBuffer('png');

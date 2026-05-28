@@ -14,16 +14,16 @@ async function main() {
     apiKey: 'YOUR_API_KEY',
 
     route: {
-      start: { name: 'Hangzhou' },
-      end: { name: 'Luoyang' },
+      start: { name: '杭州' },
+      end: { name: '洛阳' },
       waypoints: [
-        { name: 'Huangshan' },
-        { name: 'Jingdezhen' },
+        { name: '黄山' },
+        { name: '景德镇' },
         { lat: 30.5928, lng: 114.3055 }  // Wuhan by coordinates
       ]
     },
 
-    currentCity: { name: 'Wuhan' },
+    currentCity: { name: '武汉' },
 
     // Optional: custom canvas size
     width: 1200,
