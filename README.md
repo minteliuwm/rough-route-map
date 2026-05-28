@@ -13,11 +13,16 @@ Hand-drawn style route map generator for Node.js, powered by [Rough.js](https://
 - **Trip progress** - Solid lines for traveled segments, dashed for remaining
 - **China map outline** - Auto-loads province boundaries as a base layer
 - **Paper texture** - Optional noise-based paper background
+- **Decorative elements** - Ambient decorations (sun, clouds, hearts) and route decorations (stars, footprints)
+- **Title & legend** - Auto-generated route title banner and legend card
+- **DPI scaling** - Configurable scale factor for high-resolution output
 
 ## Install
 
 ```bash
 npm install rough-route-map
+# or
+yarn add rough-route-map
 ```
 
 ## Quick Start
@@ -50,25 +55,35 @@ Returns a PNG image buffer.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `mapProvider` | string | `'tencent'` | Map provider (`'tencent'` \| `'amap'`) |
-| `apiKey` | string | - | Map API Key **(required)** |
-| `route.start` | object | - | Start location **(required)** |
-| `route.end` | object | - | End location **(required)** |
-| `route.waypoints` | object[] | `[]` | Waypoint locations |
-| `currentCity` | object | `null` | Current location (splits traveled/remaining) |
-| `width` | number | `1200` | Canvas width |
-| `height` | number | `900` | Canvas height |
-| `style.roughness` | number | `1.5` | Hand-drawn roughness |
-| `style.bowing` | number | `1.2` | Line bowing |
-| `style.paperTexture` | boolean | `true` | Paper texture background |
-| `output` | string | `'./route-map.png'` | Output path (empty string to skip file saving) |
+| `mapProvider` | `string` | `'tencent'` | Map provider (`'tencent'` \| `'amap'`) |
+| `apiKey` | `string` | - | Map API Key **(required)** |
+| `route.start` | `LocationInput` | - | Start location **(required)** |
+| `route.end` | `LocationInput` | - | End location **(required)** |
+| `route.waypoints` | `LocationInput[]` | `[]` | Waypoint locations |
+| `currentCity` | `LocationInput` | `null` | Current location (splits traveled/remaining) |
+| `width` | `number` | `1200` | Canvas width (px) |
+| `height` | `number` | `900` | Canvas height (px) |
+| `style.roughness` | `number` | `1.5` | Hand-drawn roughness |
+| `style.bowing` | `number` | `1.2` | Line bowing |
+| `style.paperTexture` | `boolean` | `true` | Paper texture background |
+| `showTitle` | `boolean` | `true` | Show route title at top |
+| `showLegend` | `boolean` | `true` | Show legend card |
+| `legendLabels.traveled` | `string` | `'Traveled'` | Legend label for traveled segments |
+| `legendLabels.remaining` | `string` | `'Remaining'` | Legend label for remaining segments |
+| `concurrency` | `number` | `5` | Max API requests per second |
+| `dpi` | `number` | `2` | DPI scale factor for output clarity |
+| `output` | `string` | `'./route-map.png'` | Output path (empty string to skip file saving) |
 
 ### Location object
 
-Each location (`start`, `end`, waypoints, `currentCity`) is an object:
+Each location (`start`, `end`, waypoints, `currentCity`) is a `LocationInput`:
 
-```js
-{ name?: string, lat?: number, lng?: number }
+```ts
+interface LocationInput {
+  name?: string;
+  lat?: number;
+  lng?: number;
+}
 ```
 
 | Scenario | Behavior |
@@ -92,12 +107,27 @@ const provider = createProvider('amap', 'YOUR_KEY');
 const coords = await provider.geocode('Beijing');
 ```
 
+Available sub-modules:
+
+| Module | Import path | Description |
+|--------|-------------|-------------|
+| `geo` | `rough-route-map/geo` | Mercator projection, bounds calculation, closest-point search |
+| `api` | `rough-route-map/api` | GeoJSON boundary data fetching |
+| `drawing` | `rough-route-map/drawing` | Canvas rendering (texture, polygons, routes, markers, legend) |
+| `config` | `rough-route-map/config` | Default config and `mergeConfig()` |
+| `providers` | `rough-route-map/providers` | Map provider factory and implementations |
+| `types` | `rough-route-map/types` | TypeScript type definitions |
+
 ## Examples
 
 ### Node.js
 
 ```bash
-node examples/node/generate.js
+# 1. Replace apiKey in examples/node/generate.js
+# 2. Run:
+yarn example
+# or
+yarn build:dev && node examples/node/generate.js
 ```
 
 ## Prerequisites
@@ -107,26 +137,47 @@ node examples/node/generate.js
   - [Tencent Map](https://lbs.qq.com/dev/console/application/mine)
   - [Amap (Gaode)](https://console.amap.com/dev/key/app)
 
+## Development
+
+```bash
+# Install dependencies
+yarn install
+
+# Build (compile + minify)
+yarn build
+
+# Build without minification
+yarn build:dev
+
+# Lint
+yarn lint
+yarn lint:fix
+
+# Run example
+yarn example
+```
+
 ## Project Structure
 
 ```
 rough-route-map/
 ├── src/
-│   ├── index.js        # Package entry - exports generateMap()
-│   ├── config.js       # Default config and mergeConfig()
-│   ├── geo.js          # Projection, bounds, closest point
-│   ├── api.js          # Common API utilities (GeoJSON)
-│   ├── drawing.js      # Canvas rendering (texture, polygons, routes, markers, legend)
+│   ├── index.ts        # Package entry - exports generateMap()
+│   ├── types.ts        # TypeScript type definitions
+│   ├── config.ts       # Default config and mergeConfig()
+│   ├── geo.ts          # Projection, bounds, closest point
+│   ├── api.ts          # Common API utilities (GeoJSON)
+│   ├── drawing.ts      # Canvas rendering (texture, polygons, routes, markers, legend)
 │   └── providers/
-│       ├── index.js    # Provider factory
-│       ├── tencent.js  # Tencent Map provider
-│       └── amap.js     # Amap (Gaode) provider
+│       ├── index.ts    # Provider factory
+│       ├── tencent.ts  # Tencent Map provider
+│       └── amap.ts     # Amap (Gaode) provider
 ├── examples/
 │   └── node/
 │       └── generate.js
+├── dist/               # Compiled output
 ├── package.json
-├── .gitignore
-└── .npmignore
+└── README.md
 ```
 
 ## License
