@@ -1,5 +1,11 @@
 # rough-route-map
 
+[![npm version](https://img.shields.io/npm/v/rough-route-map.svg)](https://www.npmjs.com/package/rough-route-map)
+[![npm downloads](https://img.shields.io/npm/dm/rough-route-map.svg)](https://www.npmjs.com/package/rough-route-map)
+[![license](https://img.shields.io/npm/l/rough-route-map.svg)](https://github.com/user/rough-route-map/blob/main/LICENSE)
+[![node](https://img.shields.io/node/v/rough-route-map.svg)](https://nodejs.org)
+[![types](https://img.shields.io/npm/types/rough-route-map.svg)](https://www.npmjs.com/package/rough-route-map)
+
 [中文文档](./README.zh-CN.md)
 
 Hand-drawn style route map generator for Node.js, powered by [Rough.js](https://roughjs.com/) and [Skia Canvas](https://github.com/nicknisi/skia-canvas).
