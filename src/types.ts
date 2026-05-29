@@ -83,6 +83,9 @@ export interface UserConfig {
   dpi?: number;
   /** Canvas implementation to use (default: 'skia-canvas') */
   canvasProvider?: CanvasProvider;
+
+  /** Show China outline background (default: true) */
+  showChinaOutline?: boolean;
 }
 
 /** Merged full configuration */
@@ -101,6 +104,8 @@ export interface Config {
   concurrency: number;
   dpi: number;
   canvasProvider: CanvasProvider;
+
+  showChinaOutline: boolean;
 }
 
 /** City marker drawing options */

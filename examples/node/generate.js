@@ -28,6 +28,7 @@ async function main() {
     // Optional: custom canvas size
     width: 1200,
     height: 900,
+    dpi: 1,
 
     // Optional: custom hand-drawn style
     style: {

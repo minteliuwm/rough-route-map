@@ -8,14 +8,22 @@ import { GeoJSONFeatureCollection } from './types';
 
 export const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
 
+let chinaGeoJSONCache: GeoJSONFeatureCollection | null = null;
+
 export async function getChinaGeoJSON(): Promise<GeoJSONFeatureCollection> {
+  if (chinaGeoJSONCache) {
+    return chinaGeoJSONCache;
+  }
+
   try {
     const url = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
     const res = await fetch(url);
-    return await res.json();
+    const data = await res.json() as GeoJSONFeatureCollection;
+    chinaGeoJSONCache = data;
+    return data;
   } catch {
     console.warn('Failed to load online map data, using simplified outline');
-    return {
+    const fallback: GeoJSONFeatureCollection = {
       type: 'FeatureCollection',
       features: [{
         type: 'Feature',
@@ -28,5 +36,7 @@ export async function getChinaGeoJSON(): Promise<GeoJSONFeatureCollection> {
         }
       }]
     };
+    chinaGeoJSONCache = fallback;
+    return fallback;
   }
 }

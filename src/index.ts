@@ -5,6 +5,7 @@
 
 const rough = require('roughjs');
 import * as fs from 'fs';
+import { performance } from 'perf_hooks';
 
 import { mergeConfig } from './config';
 import { createCanvas } from './canvas-factory';
@@ -44,6 +45,9 @@ async function resolveLocation(
 ): Promise<Location | null> {
   if (!loc) return null;
 
+  const t0 = performance.now();
+  const label = loc.name || (hasCoordinates(loc) ? `[${loc.lat},${loc.lng}]` : 'unknown');
+
   if (hasCoordinates(loc)) {
     let name = loc.name || '';
     // Reverse geocode to get city name if not provided
@@ -54,14 +58,34 @@ async function resolveLocation(
         console.warn(`Reverse geocoding failed for [${loc.lat},${loc.lng}], name will be empty`);
       }
     }
+    console.log(`    ↳ Resolve "${label}": ${Math.round(performance.now() - t0)}ms`);
     return { name, lat: loc.lat!, lng: loc.lng! };
   }
 
   if (loc.name) {
-    return await provider.geocode(loc.name);
+    const result = await provider.geocode(loc.name);
+    console.log(`    ↳ Resolve "${label}": ${Math.round(performance.now() - t0)}ms`);
+    return result;
   }
 
   return null;
+}
+
+/**
+ * Check if two location inputs refer to the same place.
+ * Matches by name or by coordinate proximity.
+ */
+function isSameLocationInput(
+  a: LocationInput | null | undefined,
+  b: LocationInput | null | undefined
+): boolean {
+  if (!a || !b) return false;
+  if (a.name && b.name) return a.name === b.name;
+  if (typeof a.lat === 'number' && typeof a.lng === 'number' &&
+      typeof b.lat === 'number' && typeof b.lng === 'number') {
+    return Math.abs(a.lat - b.lat) < 0.0001 && Math.abs(a.lng - b.lng) < 0.0001;
+  }
+  return false;
 }
 
 /**
@@ -81,10 +105,78 @@ async function rateLimited<T>(tasks: (() => Promise<T>)[], perSecond: number): P
   return results;
 }
 
+/** Simple performance timer for analyzing map generation steps */
+class PerfTimer {
+  private startTime: number;
+  private marks: Array<{ label: string; duration: number }> = [];
+  private currentLabel: string | null = null;
+  private currentStart = 0;
+
+  constructor() {
+    this.startTime = performance.now();
+  }
+
+  start(label: string): void {
+    this.currentLabel = label;
+    this.currentStart = performance.now();
+  }
+
+  end(): void {
+    if (this.currentLabel !== null) {
+      const duration = Math.round(performance.now() - this.currentStart);
+      this.marks.push({ label: this.currentLabel, duration });
+      console.log(`  ⏱ ${this.currentLabel}: ${duration}ms`);
+      this.currentLabel = null;
+    }
+  }
+
+  step(label: string): void {
+    this.end();
+    this.start(label);
+  }
+
+  summary(): void {
+    const total = Math.round(performance.now() - this.startTime);
+    console.log('\n📊 Performance Summary');
+    console.log('─'.repeat(56));
+    console.log(`  Total Time: ${total}ms`);
+    for (const m of this.marks) {
+      const pct = total > 0 ? ((m.duration / total) * 100).toFixed(1) : '0.0';
+      const barLen = Math.min(20, Math.round(Number(pct) / 2));
+      const bar = barLen > 0 ? '█'.repeat(barLen) : '░';
+      console.log(`  ${m.label.padEnd(22)} ${m.duration.toString().padStart(5)}ms  ${pct.padStart(5)}%  ${bar}`);
+    }
+    console.log('─'.repeat(56));
+
+    const tips: string[] = [];
+    const resolve = this.marks.find(m => m.label === 'Resolve locations');
+    const buffer = this.marks.find(m => m.label === 'Generate image buffer');
+    const outline = this.marks.find(m => m.label === 'Draw China outline');
+
+    if (resolve && resolve.duration > 500) {
+      tips.push('地理编码耗时较长，建议传入 lat/lng 减少 geocoding，或提高 concurrency');
+    }
+    if (buffer && buffer.duration > 500) {
+      tips.push('图像编码耗时较长，建议降低 dpi（如 1）来减少 canvas 像素量');
+    }
+    if (outline && outline.duration > 100) {
+      tips.push('中国轮廓绘制耗时较长，如不需要可设置 showChinaOutline: false 跳过');
+    }
+
+    if (tips.length > 0) {
+      console.log('\n💡 Optimization Tips');
+      tips.forEach(t => console.log(`   • ${t}`));
+    }
+  }
+}
+
 /**
  * Generate a hand-drawn style route map
  */
 export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
+  const perf = new PerfTimer();
+  perf.start('Initialize & setup');
+
   const config = mergeConfig(userConfig);
 
   if (!config.apiKey) {
@@ -102,6 +194,8 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   ctx.scale(dpi, dpi);
   const rc = rough.canvas(canvasWrapper.raw);
 
+  perf.step('Draw background & decorations');
+
   // Paper texture background
   if (config.style.paperTexture) {
     drawPaperTexture(ctx, config.width, config.height);
@@ -116,7 +210,9 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   // Ambient decorations (sun, clouds, heart in empty areas)
   drawAmbientDecorations(rc, ctx, config.width, config.height);
 
-  // Resolve all locations with rate limiting
+  perf.step('Resolve locations');
+
+  // Resolve start, end, and waypoints first (these are the critical path)
   const locationTasks: (() => Promise<Location | null>)[] = [
     () => resolveLocation(config.route.start, provider).then(r => {
       if (!r) throw new Error('Failed to resolve start location. Provide name or lat/lng.');
@@ -133,27 +229,44 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
         console.warn(`Skipping waypoint: ${e instanceof Error ? e.message : String(e)}`);
         return null;
       })
-    ),
-    () => config.currentCity
-      ? resolveLocation(config.currentCity, provider).then(r => {
-          if (!r) throw new Error('Failed to resolve currentCity. Provide name or lat/lng.');
-          return r;
-        })
-      : Promise.resolve(null)
+    )
   ];
 
   const locationResults = await rateLimited(locationTasks, config.concurrency);
 
   const startCity = locationResults[0]!;
   const endCity = locationResults[1];
-  const waypointCities: Location[] = locationResults.slice(2, -1).filter((c): c is Location => c !== null);
-  const currentCity: Location = locationResults[locationResults.length - 1] || startCity;
+  const waypointCities: Location[] = locationResults.slice(2).filter((c): c is Location => c !== null);
 
-  // Fetch route
+  // Resolve currentCity with deduplication: reuse result if it matches start/end/waypoint
+  let currentCity: Location;
+  if (!config.currentCity) {
+    currentCity = startCity;
+  } else if (isSameLocationInput(config.currentCity, config.route.start)) {
+    currentCity = startCity;
+    console.log(`    ↳ Reuse start location as currentCity`);
+  } else if (config.route.end && isSameLocationInput(config.currentCity, config.route.end)) {
+    currentCity = endCity || startCity;
+    console.log(`    ↳ Reuse end location as currentCity`);
+  } else {
+    const wpIndex = config.route.waypoints.findIndex(w => isSameLocationInput(config.currentCity, w));
+    if (wpIndex >= 0 && locationResults[2 + wpIndex]) {
+      currentCity = locationResults[2 + wpIndex] as Location;
+      console.log(`    ↳ Reuse waypoint[${wpIndex}] as currentCity`);
+    } else {
+      const result = await resolveLocation(config.currentCity, provider);
+      if (!result) throw new Error('Failed to resolve currentCity. Provide name or lat/lng.');
+      currentCity = result;
+    }
+  }
+
+  perf.step('Fetch route');
+
   const routeEnd = endCity || waypointCities[waypointCities.length - 1] || currentCity;
   const routePoints = await provider.getRoute(startCity, routeEnd, waypointCities.filter(c => c !== routeEnd));
 
-  // Calculate bounds and projection
+  perf.step('Calculate bounds & projection');
+
   const allPoints = [...routePoints, startCity, ...waypointCities, currentCity, ...(endCity ? [endCity] : [])];
   const bounds = calculateBounds(allPoints, currentCity);
   const padding = {
@@ -164,22 +277,28 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   };
   const project = (lng: number, lat: number) => mercator(lng, lat, bounds, config.width, config.height, padding);
 
-  // Draw China outline (subtle, light strokes)
-  try {
-    const chinaGeoJSON = await getChinaGeoJSON();
-    chinaGeoJSON.features.forEach((feature) => {
-      const coords = feature.geometry.coordinates;
-      const type = feature.geometry.type;
+  if (config.showChinaOutline) {
+    perf.step('Draw China outline');
 
-      if (type === 'Polygon') {
-        drawPolygon(rc, coords[0] as number[][], project, feature.properties.name === 'China');
-      } else if (type === 'MultiPolygon') {
-        (coords as number[][][][]).forEach((polygon) => drawPolygon(rc, polygon[0], project, false));
-      }
-    });
-  } catch (e: unknown) {
-    console.warn('Outline drawing failed:', e instanceof Error ? e.message : String(e));
+    // Draw China outline (subtle, light strokes)
+    try {
+      const chinaGeoJSON = await getChinaGeoJSON();
+      chinaGeoJSON.features.forEach((feature) => {
+        const coords = feature.geometry.coordinates;
+        const type = feature.geometry.type;
+
+        if (type === 'Polygon') {
+          drawPolygon(rc, coords[0] as number[][], project, feature.properties.name === 'China');
+        } else if (type === 'MultiPolygon') {
+          (coords as number[][][][]).forEach((polygon) => drawPolygon(rc, polygon[0], project, false));
+        }
+      });
+    } catch (e: unknown) {
+      console.warn('Outline drawing failed:', e instanceof Error ? e.message : String(e));
+    }
   }
+
+  perf.step('Draw route & decorations');
 
   // Draw route (traveled / remaining) with healing-style colors
   const currentIndex = findClosestPointIndex(routePoints, currentCity);
@@ -206,6 +325,8 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
 
   // Route decorations (clouds, stars, footprints)
   drawRouteDecorations(rc, ctx, routePoints, project);
+
+  perf.step('Draw city markers');
 
   // Draw city markers with themed icons
   drawCityMarker(rc, ctx, startCity, project, {
@@ -238,6 +359,8 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
     });
   }
 
+  perf.step('Draw title & legend');
+
   // Title in hand-drawn banner
   if (config.showTitle) {
     const cityNames = [
@@ -254,14 +377,21 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
     drawLegend(rc, ctx, config.width - 185, config.height - 95, config.legendLabels);
   }
 
+  perf.step('Generate image buffer');
+
   // Generate buffer
   const buffer = await canvasWrapper.toBuffer();
+
+  perf.step('Save file');
 
   // Save to file if output path is specified
   if (config.output) {
     fs.writeFileSync(config.output, buffer);
     console.log(`Saved: ${config.output}`);
   }
+
+  perf.end();
+  perf.summary();
 
   return buffer;
 }

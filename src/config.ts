@@ -55,7 +55,10 @@ const DEFAULT_CONFIG: Config = {
   dpi: 2,
 
   // Canvas provider
-  canvasProvider: 'skia-canvas'
+  canvasProvider: 'skia-canvas',
+
+  // Show China outline background
+  showChinaOutline: true
 };
 
 export function mergeConfig(userConfig: UserConfig): Config {
