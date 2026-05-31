@@ -32,6 +32,14 @@
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
+    },
+    "./svg-renderer": {
+      "types": "./dist/svg-renderer.d.ts",
+      "default": "./dist/svg-renderer.js"
+    },
+    "./drawing-svg": {
+      "types": "./dist/drawing-svg.d.ts",
+      "default": "./dist/drawing-svg.js"
     }
   },
   "files": [
@@ -44,6 +52,7 @@
     "lint:fix": "eslint src/ --fix",
     "prepublishOnly": "yarn build",
     "example": "yarn build:dev && node examples/node/generate.js",
+    "example:svg": "yarn build:dev && node examples/node/generate-svg.js",
     "prepare": "husky"
   },
   "keywords": [
@@ -62,9 +71,12 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "canvas": "^3.2.3",
     "node-fetch": "^2.7.0",
-    "roughjs": "^4.6.6",
+    "roughjs": "^4.6.6"
+  },
+  "optionalDependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "canvas": "^3.2.3",
     "skia-canvas": "^1.0.2"
   },
   "devDependencies": {
