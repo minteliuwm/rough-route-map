@@ -139,7 +139,7 @@ yarn build:dev && node examples/node/generate.js
 
 ## 前置条件
 
-- Node.js >= 14
+- Node.js >= 22
 - 以下任一地图服务商的 API Key：
   - [腾讯地图](https://lbs.qq.com/dev/console/application/mine)
   - [高德地图](https://console.amap.com/dev/key/app)

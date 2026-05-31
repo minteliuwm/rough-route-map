@@ -139,7 +139,7 @@ yarn build:dev && node examples/node/generate.js
 
 ## Prerequisites
 
-- Node.js >= 14
+- Node.js >= 22
 - A map API key from one of the supported providers:
   - [Tencent Map](https://lbs.qq.com/dev/console/application/mine)
   - [Amap (Gaode)](https://console.amap.com/dev/key/app)
