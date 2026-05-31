@@ -55,7 +55,10 @@ const DEFAULT_CONFIG: Config = {
   dpi: 2,
 
   // Canvas provider
-  canvasProvider: 'skia-canvas'
+  canvasProvider: 'skia-canvas',
+
+  // Output format
+  format: 'png'
 };
 
 export function mergeConfig(userConfig: UserConfig): Config {

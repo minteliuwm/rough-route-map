@@ -22,9 +22,23 @@ import {
   drawCityMarker,
   drawTitle,
   drawLegend,
-  COLOR
+  COLOR as CANVAS_COLOR
 } from './drawing';
-import { UserConfig, Location, LocationInput, MapProvider } from './types';
+import {
+  drawPaperTextureSVG,
+  drawBorderSVG,
+  drawPolygonSVG,
+  drawRouteSVG,
+  drawDashedRouteSVG,
+  drawRouteDecorationsSVG,
+  drawAmbientDecorationsSVG,
+  drawCityMarkerSVG,
+  drawTitleSVG,
+  drawLegendSVG,
+  COLOR as SVG_COLOR
+} from './drawing-svg';
+import { createSVG } from './svg-renderer';
+import { UserConfig, Location, LocationInput, MapProvider, Config, Point } from './types';
 
 /**
  * Check if a location object has valid coordinates
@@ -81,40 +95,19 @@ async function rateLimited<T>(tasks: (() => Promise<T>)[], perSecond: number): P
   return results;
 }
 
-/**
- * Generate a hand-drawn style route map
- */
-export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
-  const config = mergeConfig(userConfig);
+// ─── Shared data preparation ────────────────────────────────────────
 
-  if (!config.apiKey) {
-    throw new Error('Missing apiKey. Please provide a map API key.');
-  }
-  if (!config.route.start) {
-    throw new Error('Missing route.start');
-  }
+interface MapData {
+  startCity: Location;
+  endCity: Location | null;
+  waypointCities: Location[];
+  currentCity: Location;
+  routePoints: Point[];
+  project: (lng: number, lat: number) => { x: number; y: number };
+}
 
+async function prepareMapData(config: Config): Promise<MapData> {
   const provider = createProvider(config.mapProvider, config.apiKey);
-
-  const dpi = config.dpi;
-  const canvasWrapper = createCanvas(config.width * dpi, config.height * dpi, config.canvasProvider);
-  const ctx = canvasWrapper.ctx;
-  ctx.scale(dpi, dpi);
-  const rc = rough.canvas(canvasWrapper.raw);
-
-  // Paper texture background
-  if (config.style.paperTexture) {
-    drawPaperTexture(ctx, config.width, config.height);
-  } else {
-    ctx.fillStyle = COLOR.bg;
-    ctx.fillRect(0, 0, config.width, config.height);
-  }
-
-  // Torn-paper decorative border
-  drawBorder(rc, ctx, config.width, config.height);
-
-  // Ambient decorations (sun, clouds, heart in empty areas)
-  drawAmbientDecorations(rc, ctx, config.width, config.height);
 
   // Resolve all locations with rate limiting
   const locationTasks: (() => Promise<Location | null>)[] = [
@@ -164,6 +157,34 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   };
   const project = (lng: number, lat: number) => mercator(lng, lat, bounds, config.width, config.height, padding);
 
+  return { startCity, endCity, waypointCities, currentCity, routePoints, project };
+}
+
+// ─── Canvas renderer ────────────────────────────────────────────────
+
+async function renderCanvas(config: Config, data: MapData): Promise<Buffer> {
+  const { startCity, endCity, waypointCities, currentCity, routePoints, project } = data;
+
+  const dpi = config.dpi;
+  const canvasWrapper = createCanvas(config.width * dpi, config.height * dpi, config.canvasProvider);
+  const ctx = canvasWrapper.ctx;
+  ctx.scale(dpi, dpi);
+  const rc = rough.canvas(canvasWrapper.raw);
+
+  // Paper texture background
+  if (config.style.paperTexture) {
+    drawPaperTexture(ctx, config.width, config.height);
+  } else {
+    ctx.fillStyle = CANVAS_COLOR.bg;
+    ctx.fillRect(0, 0, config.width, config.height);
+  }
+
+  // Torn-paper decorative border
+  drawBorder(rc, ctx, config.width, config.height);
+
+  // Ambient decorations (sun, clouds, heart in empty areas)
+  drawAmbientDecorations(rc, ctx, config.width, config.height);
+
   // Draw China outline (subtle, light strokes)
   try {
     const chinaGeoJSON = await getChinaGeoJSON();
@@ -187,7 +208,7 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   const traveled = routePoints.slice(0, currentIndex + 1);
   if (traveled.length > 1) {
     drawRoute(rc, traveled, project, {
-      stroke: COLOR.traveled,
+      stroke: CANVAS_COLOR.traveled,
       strokeWidth: 4,
       roughness: config.style.roughness,
       bowing: config.style.bowing
@@ -197,7 +218,7 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
   const remaining = routePoints.slice(currentIndex);
   if (remaining.length > 1) {
     drawDashedRoute(rc, remaining, project, {
-      stroke: COLOR.remaining,
+      stroke: CANVAS_COLOR.remaining,
       strokeWidth: 3.5,
       roughness: config.style.roughness * 1.2,
       bowing: config.style.bowing
@@ -209,32 +230,30 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
 
   // Draw city markers with themed icons
   drawCityMarker(rc, ctx, startCity, project, {
-    type: 'start', color: COLOR.start, label: ''
+    type: 'start', color: CANVAS_COLOR.start, label: ''
   });
 
-  // Check if a city is the current location (by coordinate proximity)
   const isCurrentCity = (city: Location): boolean => {
     const dist = Math.pow(city.lat - currentCity.lat, 2) + Math.pow(city.lng - currentCity.lng, 2);
-    return dist < 0.001; // ~0.03 degree tolerance
+    return dist < 0.001;
   };
 
   waypointCities.forEach(city => {
-    if (isCurrentCity(city)) return; // skip, will draw as current separately
+    if (isCurrentCity(city)) return;
     drawCityMarker(rc, ctx, city, project, {
-      type: 'waypoint', color: COLOR.waypoint, label: ''
+      type: 'waypoint', color: CANVAS_COLOR.waypoint, label: ''
     });
   });
 
   if (endCity) {
     drawCityMarker(rc, ctx, endCity, project, {
-      type: 'end', color: COLOR.end, label: ''
+      type: 'end', color: CANVAS_COLOR.end, label: ''
     });
   }
 
-  // Always draw current city marker on top (car icon)
   if (!isCurrentCity(startCity) && !(endCity && isCurrentCity(endCity))) {
     drawCityMarker(rc, ctx, currentCity, project, {
-      type: 'current', color: COLOR.current, label: ''
+      type: 'current', color: CANVAS_COLOR.current, label: ''
     });
   }
 
@@ -254,22 +273,206 @@ export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
     drawLegend(rc, ctx, config.width - 185, config.height - 95, config.legendLabels);
   }
 
-  // Generate buffer
   const buffer = await canvasWrapper.toBuffer();
 
-  // Save to file if output path is specified
   if (config.output) {
-    fs.writeFileSync(config.output, buffer);
-    console.log(`Saved: ${config.output}`);
+    const outputPath = config.output.replace(/\.svg$/, '.png');
+    fs.writeFileSync(outputPath, buffer);
+    console.log(`Saved: ${outputPath}`);
   }
 
   return buffer;
+}
+
+// ─── SVG renderer ───────────────────────────────────────────────────
+
+async function renderSVG(config: Config, data: MapData): Promise<Buffer> {
+  const { startCity, endCity, waypointCities, currentCity, routePoints, project } = data;
+
+  const svgWrapper = createSVG(config.width, config.height);
+  const svg = svgWrapper.svg;
+  const defs = svgWrapper.defs;
+  const rc = svgWrapper.rc;
+
+  // Paper texture background
+  if (config.style.paperTexture) {
+    drawPaperTextureSVG(svg, defs, config.width, config.height);
+  } else {
+    const bg = svg.ownerDocument!.createElementNS('http://www.w3.org/2000/svg', 'rect') as unknown as SVGElement;
+    bg.setAttribute('width', '100%');
+    bg.setAttribute('height', '100%');
+    bg.setAttribute('fill', SVG_COLOR.bg);
+    svg.appendChild(bg as unknown as Node);
+  }
+
+  // Torn-paper decorative border
+  drawBorderSVG(rc, svg, config.width, config.height);
+
+  // Ambient decorations
+  drawAmbientDecorationsSVG(rc, svg, config.width, config.height);
+
+  // Draw China outline
+  try {
+    const chinaGeoJSON = await getChinaGeoJSON();
+    chinaGeoJSON.features.forEach((feature) => {
+      const coords = feature.geometry.coordinates;
+      const type = feature.geometry.type;
+
+      if (type === 'Polygon') {
+        drawPolygonSVG(rc, svg, coords[0] as number[][], project, feature.properties.name === 'China');
+      } else if (type === 'MultiPolygon') {
+        (coords as number[][][][]).forEach((polygon) => drawPolygonSVG(rc, svg, polygon[0], project, false));
+      }
+    });
+  } catch (e: unknown) {
+    console.warn('Outline drawing failed:', e instanceof Error ? e.message : String(e));
+  }
+
+  // Draw route
+  const currentIndex = findClosestPointIndex(routePoints, currentCity);
+
+  const traveled = routePoints.slice(0, currentIndex + 1);
+  if (traveled.length > 1) {
+    drawRouteSVG(rc, svg, traveled, project, {
+      stroke: SVG_COLOR.traveled,
+      strokeWidth: 4,
+      roughness: config.style.roughness,
+      bowing: config.style.bowing
+    });
+  }
+
+  const remaining = routePoints.slice(currentIndex);
+  if (remaining.length > 1) {
+    drawDashedRouteSVG(rc, svg, remaining, project, {
+      stroke: SVG_COLOR.remaining,
+      strokeWidth: 3.5,
+      roughness: config.style.roughness * 1.2,
+      bowing: config.style.bowing
+    });
+  }
+
+  // Route decorations
+  drawRouteDecorationsSVG(rc, svg, routePoints, project);
+
+  // City markers
+  drawCityMarkerSVG(rc, svg, startCity, project, {
+    type: 'start', color: SVG_COLOR.start, label: ''
+  });
+
+  const isCurrentCity = (city: Location): boolean => {
+    const dist = Math.pow(city.lat - currentCity.lat, 2) + Math.pow(city.lng - currentCity.lng, 2);
+    return dist < 0.001;
+  };
+
+  waypointCities.forEach(city => {
+    if (isCurrentCity(city)) return;
+    drawCityMarkerSVG(rc, svg, city, project, {
+      type: 'waypoint', color: SVG_COLOR.waypoint, label: ''
+    });
+  });
+
+  if (endCity) {
+    drawCityMarkerSVG(rc, svg, endCity, project, {
+      type: 'end', color: SVG_COLOR.end, label: ''
+    });
+  }
+
+  if (!isCurrentCity(startCity) && !(endCity && isCurrentCity(endCity))) {
+    drawCityMarkerSVG(rc, svg, currentCity, project, {
+      type: 'current', color: SVG_COLOR.current, label: ''
+    });
+  }
+
+  // Title
+  if (config.showTitle) {
+    const cityNames = [
+      startCity.name || 'Start',
+      ...waypointCities.map(c => c.name || '...'),
+      ...(endCity ? [endCity.name || 'End'] : [])
+    ];
+    const title = cityNames.join(' > ');
+    drawTitleSVG(rc, svg, title, config.width);
+  }
+
+  // Legend
+  if (config.showLegend) {
+    drawLegendSVG(rc, svg, config.width - 185, config.height - 95, config.legendLabels);
+  }
+
+  const buffer = svgWrapper.toBuffer();
+
+  if (config.output) {
+    const outputPath = config.output.replace(/\.png$/, '.svg');
+    fs.writeFileSync(outputPath, buffer);
+    console.log(`Saved: ${outputPath}`);
+  }
+
+  return buffer;
+}
+
+// ─── Public API ─────────────────────────────────────────────────────
+
+/**
+ * Generate a hand-drawn style route map
+ */
+export async function generateMap(userConfig: UserConfig): Promise<Buffer> {
+  const config = mergeConfig(userConfig);
+
+  if (!config.apiKey) {
+    throw new Error('Missing apiKey. Please provide a map API key.');
+  }
+  if (!config.route.start) {
+    throw new Error('Missing route.start');
+  }
+
+  // Check optional dependencies before starting
+  if (config.format === 'svg') {
+    try {
+      require('@xmldom/xmldom');
+    } catch {
+      throw new Error(
+        'For SVG output, "@xmldom/xmldom" is required. ' +
+        'Install it with: npm install @xmldom/xmldom  (or yarn add @xmldom/xmldom)'
+      );
+    }
+  } else {
+    // Check for canvas dependencies
+    let hasCanvas = false;
+    try {
+      require('skia-canvas');
+      hasCanvas = true;
+    } catch {
+      try {
+        require('canvas');
+        hasCanvas = true;
+      } catch {
+        // no canvas available
+      }
+    }
+    if (!hasCanvas) {
+      throw new Error(
+        'For PNG output, either "skia-canvas" or "canvas" is required. ' +
+        'Install one with:\n' +
+        '  npm install skia-canvas  (or yarn add skia-canvas)\n' +
+        '  or\n' +
+        '  npm install canvas  (or yarn add canvas)'
+      );
+    }
+  }
+
+  const data = await prepareMapData(config);
+
+  if (config.format === 'svg') {
+    return renderSVG(config, data);
+  }
+  return renderCanvas(config, data);
 }
 
 // Re-export sub-modules for advanced usage
 export * as geo from './geo';
 export * as api from './api';
 export * as drawing from './drawing';
+export * as drawingSvg from './drawing-svg';
 export * as config from './config';
 export * as providers from './providers';
 export * from './types';

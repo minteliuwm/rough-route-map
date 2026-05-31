@@ -64,6 +64,9 @@ export interface LegendLabels {
 /** Canvas provider type */
 export type CanvasProvider = 'skia-canvas' | 'canvas';
 
+/** Output format type */
+export type OutputFormat = 'png' | 'svg';
+
 /** User configuration input */
 export interface UserConfig {
   width?: number;
@@ -83,6 +86,8 @@ export interface UserConfig {
   dpi?: number;
   /** Canvas implementation to use (default: 'skia-canvas') */
   canvasProvider?: CanvasProvider;
+  /** Output format: 'png' (default) or 'svg' */
+  format?: OutputFormat;
 }
 
 /** Merged full configuration */
@@ -101,6 +106,7 @@ export interface Config {
   concurrency: number;
   dpi: number;
   canvasProvider: CanvasProvider;
+  format: OutputFormat;
 }
 
 /** City marker drawing options */

@@ -41,7 +41,7 @@ const COLOR = {
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-function samplePoints(points: Point[], step: number): Point[] {
+export function samplePoints(points: Point[], step: number): Point[] {
   const result: Point[] = [];
   for (let i = 0; i < points.length; i += step) {
     result.push(points[i]);
@@ -53,7 +53,7 @@ function samplePoints(points: Point[], step: number): Point[] {
 }
 
 /** Random jitter for hand-drawn feel */
-function jitter(v: number, amount = 1.5): number {
+export function jitter(v: number, amount = 1.5): number {
   return v + (Math.random() - 0.5) * amount;
 }
 
