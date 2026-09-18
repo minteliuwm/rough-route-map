@@ -6,7 +6,11 @@
 [![node](https://img.shields.io/node/v/rough-route-map.svg)](https://nodejs.org)
 [![types](https://img.shields.io/npm/types/rough-route-map.svg)](https://www.npmjs.com/package/rough-route-map)
 
-[English](./README.md)
+<div align="center">
+
+[English](./README.md) | **简体中文**
+
+</div>
 
 手绘风格路线图生成器，基于 [Rough.js](https://roughjs.com/) 和 [Skia Canvas](https://github.com/nicknisi/skia-canvas) 构建。
 
